@@ -1,6 +1,13 @@
 __pycache__/
 *.pyc
 .DS_Store
-dbq_files_generated/
+
+# Generated output directory (keep placeholder)
+dbq_files_generated/*
+!dbq_files_generated/.gitkeep
+
+# Answers JSON files (keep directory)
 json_data/*.json
+
+# Source PDFs (keep directory with placeholder)
 dbq_files/*.pdf
