@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.DS_Store
+dbq_files_generated/
+json_data/*.json
+dbq_files/*.pdf
