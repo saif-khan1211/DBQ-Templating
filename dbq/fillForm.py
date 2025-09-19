@@ -97,8 +97,8 @@ def fillForm():
                         return k
         except Exception:
             pass
-        # fallbacks
-        return 'Yes'
+        # no reliable on-state name
+        return None
 
     for group_name, widgets in btn_groups.items():
         desired = answers.get(group_name)
@@ -127,7 +127,7 @@ def fillForm():
         if len(widgets) == 1:
             # Single checkbox semantics
             a = widgets[0]
-            on_name = get_on_state(a)
+            on_name = get_on_state(a) or 'On'
             try:
                 if is_truthy:
                     a.update(PdfDict(V=PdfName(on_name), AS=PdfName(on_name)))
@@ -138,23 +138,56 @@ def fillForm():
             continue
 
         # Radio group selection
+        selected_index = None
         if explicit_index is not None:
             selected_index = max(0, min(len(widgets) - 1, explicit_index))
         else:
-            # Use per-group overrides if present. Default assumption: index 0 = No, index 1 = Yes
-            ov = overrides.get(group_name, {}) if isinstance(overrides, dict) else {}
-            truthy_idx = ov.get('truthy_index', 1 if len(widgets) > 1 else 0)
-            falsy_idx = ov.get('falsy_index', 0)
-            selected_index = truthy_idx if is_truthy else falsy_idx
+            # Try to match on-state names against 'yes'/'no' if present
+            on_states = []
+            for a in widgets:
+                st = get_on_state(a)
+                on_states.append(st.lower() if st else None)
+            if is_truthy and 'yes' in on_states:
+                selected_index = on_states.index('yes')
+            elif (not is_truthy) and 'no' in on_states:
+                selected_index = on_states.index('no')
+            # Fallback to overrides
+            if selected_index is None:
+                ov = overrides.get(group_name, {}) if isinstance(overrides, dict) else {}
+                # Default assumption aligned with common layouts: index 0 = Yes (left), index 1 = No (right)
+                truthy_idx = ov.get('truthy_index', 0)
+                falsy_idx = ov.get('falsy_index', 1 if len(widgets) > 1 else 0)
+                selected_index = truthy_idx if is_truthy else falsy_idx
             selected_index = max(0, min(len(widgets) - 1, selected_index))
+        # Determine selected widget's best on-state
+        sel_widget = widgets[selected_index]
+        sel_on = get_on_state(sel_widget)
+        if not sel_on:
+            # Try infer from union of states
+            union_states = []
+            for a in widgets:
+                st = get_on_state(a)
+                if st:
+                    union_states.append(st)
+            if is_truthy and 'Yes' in union_states:
+                sel_on = 'Yes'
+            elif (not is_truthy) and 'No' in union_states:
+                sel_on = 'No'
+            else:
+                sel_on = 'Yes' if is_truthy else None
+
+        # Apply selection: set parent /V when we have a concrete state; always set widget AS
         for i, a in enumerate(widgets):
-            on_name = get_on_state(a)
             try:
                 if i == selected_index:
-                    # Set group value and widget appearance
-                    if parent_obj:
-                        parent_obj.update(PdfDict(V=PdfName(on_name)))
-                    a.update(PdfDict(AS=PdfName(on_name)))
+                    if sel_on:
+                        if parent_obj:
+                            parent_obj.update(PdfDict(V=PdfName(sel_on)))
+                        a.update(PdfDict(AS=PdfName(sel_on)))
+                        a.update(PdfDict(V=PdfName(sel_on)))
+                    else:
+                        # Last resort, no known state: set Off on others and leave this one as 'On'
+                        a.update(PdfDict(AS=PdfName('On')))
                 else:
                     a.update(PdfDict(AS=PdfName('Off')))
             except Exception:
