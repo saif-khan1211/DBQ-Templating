@@ -1,5 +1,5 @@
 from pdfrw import PdfReader
-# comments
+
 def extract_fields(obj, fields, parent_name=""):
     """
     Recursively extract all field names, including nested /Kids.
